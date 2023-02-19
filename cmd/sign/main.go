@@ -35,7 +35,7 @@ func run(a args) error {
 
 	var ma crypto.MultisigAccount
 	if len(addrs) > 1 {
-		ma, err := crypto.MultisigAccountWithParams(1, uint8(a.Threshold), addrs)
+		ma, err = crypto.MultisigAccountWithParams(1, uint8(a.Threshold), addrs)
 		if err != nil {
 			return errors.Wrap(err, "failed to build multisig account")
 		}
