@@ -43,7 +43,7 @@ func signTransctionFromInput(txn types.Transaction, rdr *bufio.Reader) ([]byte, 
 	bs := msgpack.Encode(txn)
 
 	fmt.Println(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(bs))
-	fmt.Println("Enter signed transaction base32:")
+	fmt.Println("Enter signed transaction base32 (or file path with < prefix, e.g. <txn1):")
 
 	pstx32, err := rdr.ReadString('\n')
 	if err != nil {
@@ -51,6 +51,15 @@ func signTransctionFromInput(txn types.Transaction, rdr *bufio.Reader) ([]byte, 
 	}
 
 	pstx32 = strings.TrimSpace(pstx32)
+
+	if strings.HasPrefix(pstx32, "<") {
+		bs, err := os.ReadFile(pstx32[1:])
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to read transaction file")
+		}
+
+		pstx32 = string(bs)
+	}
 
 	pstx, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(pstx32)
 	if err != nil {
