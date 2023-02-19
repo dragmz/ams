@@ -2,9 +2,9 @@ package main
 
 import (
 	"bufio"
+	"encoding/base32"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -16,6 +16,7 @@ import (
 	"github.com/algorand/go-algorand-sdk/types"
 	"github.com/dragmz/ams"
 	"github.com/dragmz/wc"
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -34,6 +35,29 @@ type AlgoSignTxnRequestParams struct {
 
 type AlgoSignTxnRequest struct {
 	Params [][]AlgoSignTxnRequestParams `json:"params"`
+}
+
+func signTransctionFromInput(txn types.Transaction, rdr *bufio.Reader) ([]byte, error) {
+	fmt.Println("Transaction base32:")
+
+	bs := msgpack.Encode(txn)
+
+	fmt.Println(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(bs))
+	fmt.Println("Enter signed transaction base32:")
+
+	pstx32, err := rdr.ReadString('\n')
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read transaction from reader")
+	}
+
+	pstx32 = strings.TrimSpace(pstx32)
+
+	pstx, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(pstx32)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode transaction")
+	}
+
+	return pstx, nil
 }
 
 func run(a args) error {
@@ -188,19 +212,9 @@ func run(a args) error {
 						}
 
 						for len(pstxs) < int(a.Threshold) {
-							fmt.Println("Transaction base64:")
-							bs := msgpack.Encode(txn)
-							fmt.Println(base64.StdEncoding.EncodeToString(bs))
-							fmt.Println("Enter signed transaction base64:")
-
-							pstx64, err := rdr.ReadString('\n')
+							pstx, err := signTransctionFromInput(txn, rdr)
 							if err != nil {
-								return err
-							}
-
-							pstx, err := base64.StdEncoding.DecodeString(pstx64)
-							if err != nil {
-								return err
+								return errors.Wrap(err, "failed to sign transaction from input")
 							}
 
 							pstxs = append(pstxs, pstx)
@@ -215,8 +229,11 @@ func run(a args) error {
 							stx = pstxs[0]
 						}
 					} else {
-						// TODO: fails if not sks provided - should ask for signed trnsaction base64 as for multisig
-						_, stx, err = crypto.SignTransaction(sks[0], txn)
+						if len(sks) > 0 {
+							_, stx, err = crypto.SignTransaction(sks[0], txn)
+						} else {
+							stx, err = signTransctionFromInput(txn, rdr)
+						}
 					}
 
 					if err != nil {
