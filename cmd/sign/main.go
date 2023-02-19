@@ -3,10 +3,10 @@ package main
 import (
 	"bufio"
 	"encoding/base64"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/algorand/go-algorand-sdk/crypto"
 	"github.com/algorand/go-algorand-sdk/encoding/msgpack"
@@ -23,17 +23,13 @@ type args struct {
 }
 
 func run(a args) error {
-	parts := strings.Split(a.Addresses, ",")
-	addrs := make([]types.Address, len(parts))
+	addrs, err := ams.ParseAddrs(a.Addresses, ",")
+	if err != nil {
+		return err
+	}
 
-	for i := 0; i < len(parts); i++ {
-		addr, err := types.DecodeAddress(parts[i])
-		if err != nil {
-			return err
-		}
-
-		addrs[i] = addr
-
+	if len(addrs) == 0 {
+		return errors.New("missing address")
 	}
 
 	ma, err := crypto.MultisigAccountWithParams(1, uint8(a.Threshold), addrs)

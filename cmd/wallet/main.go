@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -23,6 +24,7 @@ type args struct {
 	Address   string
 	Mnemonic  string
 	Threshold uint
+	Debug     bool
 }
 
 type AlgoSignTxnRequestParams struct {
@@ -35,18 +37,14 @@ type AlgoSignTxnRequest struct {
 }
 
 func run(a args) error {
-	addrs := strings.Split(a.Address, ",")
-
-	var accs []types.Address
-	for _, addr := range addrs {
-		acc, err := types.DecodeAddress(addr)
-		if err != nil {
-			return err
-		}
-		accs = append(accs, acc)
+	accs, err := ams.ParseAddrs(a.Address, ",")
+	if err != nil {
+		return err
 	}
 
-	var err error
+	if len(accs) == 0 {
+		return errors.New("missing address")
+	}
 
 	var addr string
 	var ma crypto.MultisigAccount
@@ -65,7 +63,7 @@ func run(a args) error {
 
 		fmt.Println("Multisig:", addr)
 	} else {
-		addr = addrs[0]
+		addr = accs[0].String()
 	}
 
 	var sks []ed25519.PrivateKey
@@ -82,16 +80,20 @@ func run(a args) error {
 		}
 	}
 
-	fmt.Println("Sks:", len(sks))
+	if a.Debug {
+		fmt.Println("Sks:", len(sks))
+	}
 
 	u, err := wc.ParseUri(a.Uri)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("Uri:", u)
+	if a.Debug {
+		fmt.Println("Uri:", u)
+	}
 
-	c, err := wc.MakeConn(wc.WithKey(u.Key), wc.WithHost(u.Url.Host), wc.WithDebug(true))
+	c, err := wc.MakeConn(wc.WithKey(u.Key), wc.WithHost(u.Url.Host), wc.WithDebug(a.Debug))
 	if err != nil {
 		return err
 	}
@@ -112,10 +114,14 @@ func run(a args) error {
 
 		if r.Method == "" {
 			// response
-			fmt.Println("GOT RESPONSE")
+			if a.Debug {
+				fmt.Println("GOT RESPONSE")
+			}
 		} else {
 			// request
-			fmt.Println("GOT REQUEST")
+			if a.Debug {
+				fmt.Println("GOT REQUEST")
+			}
 
 			switch r.Method {
 			case "algo_signTxn":
@@ -150,7 +156,9 @@ func run(a args) error {
 
 					txs[i] = txn
 
-					fmt.Println("Txn:", i, ", skipped:", skips[i])
+					if a.Debug {
+						fmt.Println("Txn:", i, ", skipped:", skips[i])
+					}
 					fmt.Println(ams.FormatTxn(txn))
 				}
 
@@ -167,7 +175,9 @@ func run(a args) error {
 					if len(accs) > 1 {
 						var pstxs [][]byte
 						for i, sk := range sks {
-							fmt.Printf("Signing with sk #%d\n", i)
+							if a.Debug {
+								fmt.Printf("Signing with sk #%d\n", i)
+							}
 
 							_, pstx, err := crypto.SignMultisigTransaction(sk, ma, txn)
 							if err != nil {
@@ -178,12 +188,10 @@ func run(a args) error {
 						}
 
 						for len(pstxs) < int(a.Threshold) {
-							fmt.Println("Sign the following transaction:")
-
-							bs := msgpack.Encode(txn)
 							fmt.Println("Transaction base64:")
+							bs := msgpack.Encode(txn)
 							fmt.Println(base64.StdEncoding.EncodeToString(bs))
-							fmt.Println("Enter signed transaction:")
+							fmt.Println("Enter signed transaction base64:")
 
 							pstx64, err := rdr.ReadString('\n')
 							if err != nil {
@@ -199,12 +207,15 @@ func run(a args) error {
 						}
 
 						if a.Threshold > 1 {
-							fmt.Println("Merging multisig txn..")
+							if a.Debug {
+								fmt.Println("Merging multisig txn..")
+							}
 							_, stx, err = crypto.MergeMultisigTransactions(pstxs...)
 						} else {
 							stx = pstxs[0]
 						}
 					} else {
+						// TODO: fails if not sks provided - should ask for signed trnsaction base64 as for multisig
 						_, stx, err = crypto.SignTransaction(sks[0], txn)
 					}
 
@@ -281,6 +292,7 @@ func main() {
 	flag.StringVar(&a.Address, "addr", "", "Algorand account address")
 	flag.StringVar(&a.Mnemonic, "mnemonic", "", "Signer mnemonic")
 	flag.UintVar(&a.Threshold, "threshold", 0, "Multisig threshold")
+	flag.BoolVar(&a.Debug, "debug", false, "debug mode")
 	flag.Parse()
 
 	err := run(a)
