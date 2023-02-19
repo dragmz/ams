@@ -79,6 +79,10 @@ func run(a args) error {
 		return errors.New("missing address")
 	}
 
+	if len(accs) < int(a.Threshold) {
+		return errors.New("number of addresses is less than the threshold")
+	}
+
 	var addr string
 	var ma crypto.MultisigAccount
 
