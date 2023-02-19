@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/base32"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
@@ -42,7 +41,7 @@ func signTransctionFromInput(txn types.Transaction, rdr *bufio.Reader) ([]byte, 
 
 	bs := msgpack.Encode(txn)
 
-	fmt.Println(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(bs))
+	fmt.Println(ams.TxnTransferEncoding.EncodeToString(bs))
 	fmt.Println("Enter signed transaction base32 (or file path with < prefix, e.g. <txn1):")
 
 	pstx32, err := ams.ReadInput(rdr)
@@ -50,7 +49,7 @@ func signTransctionFromInput(txn types.Transaction, rdr *bufio.Reader) ([]byte, 
 		return nil, errors.Wrap(err, "failed to read transaction input")
 	}
 
-	pstx, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(pstx32)
+	pstx, err := ams.TxnTransferEncoding.DecodeString(pstx32)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode transaction")
 	}

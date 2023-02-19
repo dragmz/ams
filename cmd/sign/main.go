@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/base32"
 	"flag"
 	"fmt"
 	"os"
@@ -65,7 +64,7 @@ func run(a args) error {
 		}
 	}
 
-	bs, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(txnstr)
+	bs, err := ams.TxnTransferEncoding.DecodeString(txnstr)
 	if err != nil {
 		return errors.Wrap(err, "failed to decode transaction data")
 	}
@@ -94,7 +93,7 @@ func run(a args) error {
 	}
 
 	fmt.Println("Signed txn base32:")
-	fmt.Println(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(stx))
+	fmt.Println(ams.TxnTransferEncoding.EncodeToString(stx))
 
 	return nil
 }
