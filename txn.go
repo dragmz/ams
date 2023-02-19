@@ -1,6 +1,7 @@
 package ams
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strings"
 
@@ -29,7 +30,9 @@ func FormatTxn(txn types.Transaction) string {
 		}
 	}
 
-	out.WriteString(fmt.Sprintf("Group Id: %s\n", txn.Group))
+	if len(txn.Group) == 0 {
+		out.WriteString(fmt.Sprintf("Group Id: %s\n", base64.StdEncoding.EncodeToString(txn.Group[:])))
+	}
 	out.WriteString(fmt.Sprintf("Validity: %d..%d (%d rounds)\n", txn.FirstValid, txn.LastValid, txn.LastValid-txn.FirstValid+1))
 
 	if !txn.RekeyTo.IsZero() {
