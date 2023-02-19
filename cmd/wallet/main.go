@@ -276,10 +276,9 @@ func run(a args) error {
 				result := wc.SessionRequestResponseResult{
 					PeerId: peer,
 					PeerMeta: wc.SessionRequestPeerMeta{
-						Description: "Some Test Wallet",
-						Url:         "https://example.com/",
-						Name:        "Test Wallet",
-					},
+						Description: "Algorand Multisig Tools",
+						Url:         "https://github.com/dragmz/ams",
+						Name:        "AMS"},
 					Approved: true,
 					ChainId:  4160,
 					Accounts: []string{
