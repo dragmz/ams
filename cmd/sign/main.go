@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"encoding/base64"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"github.com/algorand/go-algorand-sdk/mnemonic"
 	"github.com/algorand/go-algorand-sdk/types"
 	"github.com/dragmz/ams"
+	"github.com/pkg/errors"
 )
 
 type args struct {
@@ -25,7 +25,7 @@ type args struct {
 func run(a args) error {
 	addrs, err := ams.ParseAddrs(a.Addresses, ",")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to parse addresses")
 	}
 
 	if len(addrs) == 0 {
@@ -34,19 +34,19 @@ func run(a args) error {
 
 	ma, err := crypto.MultisigAccountWithParams(1, uint8(a.Threshold), addrs)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to build multisig account")
 	}
 
 	addr, err := ma.Address()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get multisig address")
 	}
 
 	fmt.Println("Multisig address:", addr)
 
 	sk, err := mnemonic.ToPrivateKey(a.Mnemonic)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to convert mnemonic to private key")
 	}
 
 	rdr := bufio.NewReader(os.Stdin)
@@ -56,19 +56,19 @@ func run(a args) error {
 		fmt.Println("Enter transaction base64:")
 		txnstr, err = rdr.ReadString('\n')
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to read transaction data")
 		}
 	}
 
 	bs, err := base64.StdEncoding.DecodeString(txnstr)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to decode transaction data")
 	}
 
 	var tx types.Transaction
 	err = msgpack.Decode(bs, &tx)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to decode transaction msgpack")
 	}
 
 	fmt.Println("- Transaction Details -")
@@ -78,7 +78,7 @@ func run(a args) error {
 
 	_, stx, err := crypto.SignMultisigTransaction(sk, ma, tx)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to sign transaction")
 	}
 
 	fmt.Println("Signed txn base64:")
