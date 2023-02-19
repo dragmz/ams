@@ -58,6 +58,10 @@ func signTransctionFromInput(txn types.Transaction, rdr *bufio.Reader) ([]byte, 
 }
 
 func run(a args) error {
+	if a.Threshold == 0 {
+		return errors.New("threshold must be >= 0")
+	}
+
 	accs, err := ams.ParseAddrs(a.Address, ",")
 	if err != nil {
 		return err
@@ -197,48 +201,46 @@ func run(a args) error {
 					}
 
 					var stx []byte
-					if len(accs) > 1 {
-						var pstxs [][]byte
-						for i, sk := range sks {
-							if a.Debug {
-								fmt.Printf("Signing with sk #%d\n", i)
-							}
+					var pstxs [][]byte
 
-							_, pstx, err := crypto.SignMultisigTransaction(sk, ma, txn)
+					for i, sk := range sks {
+						if a.Debug {
+							fmt.Printf("Signing with sk #%d\n", i)
+						}
+
+						var pstx []byte
+
+						if len(accs) > 1 {
+							_, pstx, err = crypto.SignMultisigTransaction(sk, ma, txn)
 							if err != nil {
-								return err
+								return errors.Wrap(err, "failed to sign multisig transaction")
 							}
-
-							pstxs = append(pstxs, pstx)
-						}
-
-						for len(pstxs) < int(a.Threshold) {
-							pstx, err := signTransctionFromInput(txn, rdr)
+						} else {
+							_, pstx, err = crypto.SignTransaction(sks[0], txn)
 							if err != nil {
-								return errors.Wrap(err, "failed to sign transaction from input")
+								return errors.Wrap(err, "failed to sign transaction")
 							}
-
-							pstxs = append(pstxs, pstx)
 						}
 
-						if a.Threshold > 1 {
-							if a.Debug {
-								fmt.Println("Merging multisig txn..")
-							}
-							_, stx, err = crypto.MergeMultisigTransactions(pstxs...)
-						} else {
-							stx = pstxs[0]
-						}
-					} else {
-						if len(sks) > 0 {
-							_, stx, err = crypto.SignTransaction(sks[0], txn)
-						} else {
-							stx, err = signTransctionFromInput(txn, rdr)
-						}
+						pstxs = append(pstxs, pstx)
 					}
 
-					if err != nil {
-						return err
+					for len(pstxs) < int(a.Threshold) {
+						pstx, err := signTransctionFromInput(txn, rdr)
+						if err != nil {
+							return errors.Wrap(err, "failed to sign transaction from input")
+						}
+
+						pstxs = append(pstxs, pstx)
+					}
+
+					if len(accs) > 1 && a.Threshold > 1 {
+						_, stx, err = crypto.MergeMultisigTransactions(pstxs...)
+						if err != nil {
+							return errors.Wrap(err, "failed to merge multisig transactions")
+						}
+					} else {
+						stx = pstxs[0]
 					}
 
 					b64stx := base64.StdEncoding.EncodeToString(stx)
@@ -308,7 +310,7 @@ func main() {
 	flag.StringVar(&a.Uri, "uri", "", "WalletConnect uri")
 	flag.StringVar(&a.Address, "addr", "", "Algorand account address")
 	flag.StringVar(&a.Mnemonic, "mnemonic", "", "Signer mnemonic")
-	flag.UintVar(&a.Threshold, "threshold", 0, "Multisig threshold")
+	flag.UintVar(&a.Threshold, "threshold", 1, "Multisig threshold")
 	flag.BoolVar(&a.Debug, "debug", false, "debug mode")
 	flag.Parse()
 
