@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/algorand/go-algorand-sdk/crypto"
 	"github.com/algorand/go-algorand-sdk/encoding/msgpack"
@@ -60,11 +59,10 @@ func run(a args) error {
 	var txnstr = a.Txn
 	if txnstr == "" {
 		fmt.Println("Enter transaction base32:")
-		txnstr, err = rdr.ReadString('\n')
+		txnstr, err = ams.ReadInput(rdr)
 		if err != nil {
 			return errors.Wrap(err, "failed to read transaction data")
 		}
-		txnstr = strings.TrimSpace(txnstr)
 	}
 
 	bs, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(txnstr)

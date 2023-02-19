@@ -45,20 +45,9 @@ func signTransctionFromInput(txn types.Transaction, rdr *bufio.Reader) ([]byte, 
 	fmt.Println(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(bs))
 	fmt.Println("Enter signed transaction base32 (or file path with < prefix, e.g. <txn1):")
 
-	pstx32, err := rdr.ReadString('\n')
+	pstx32, err := ams.ReadInput(rdr)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to read transaction from reader")
-	}
-
-	pstx32 = strings.TrimSpace(pstx32)
-
-	if strings.HasPrefix(pstx32, "<") {
-		bs, err := os.ReadFile(pstx32[1:])
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to read transaction file")
-		}
-
-		pstx32 = string(bs)
+		return nil, errors.Wrap(err, "failed to read transaction input")
 	}
 
 	pstx, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(pstx32)
