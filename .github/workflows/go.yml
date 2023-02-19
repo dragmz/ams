@@ -24,26 +24,26 @@ jobs:
     - name: Test
       run: go test -v ./...
 
-    - name: Build wallet win/x64
-      run: env GOOS=windows GOARCH=amd64 go build -o msig_wallet_win_x64.exe cmd/wallet/main.go
+    - name: Build wallet win/amd64
+      run: env GOOS=windows GOARCH=amd64 go build -o msig_wallet_win_amd64.exe cmd/wallet/main.go
 
-    - name: Build wallet linux/x64
-      run: env GOOS=linux GOARCH=amd64 go build -o msig_wallet_linux_x64 cmd/wallet/main.go
+    - name: Build wallet linux/amd64
+      run: env GOOS=linux GOARCH=amd64 go build -o msig_wallet_linux_amd64 cmd/wallet/main.go
 
-    - name: Build wallet darwin/x64
-      run: env GOOS=darwin GOARCH=amd64 go build -o msig_wallet_darwin_x64 cmd/wallet/main.go
+    - name: Build wallet darwin/amd64
+      run: env GOOS=darwin GOARCH=amd64 go build -o msig_wallet_darwin_amd64 cmd/wallet/main.go
 
     - name: Build wallet darwin/arm64
       run: env GOOS=darwin GOARCH=arm64 go build -o msig_wallet_darwin_arm64 cmd/wallet/main.go
 
-    - name: Build sign win/x64
-      run: env GOOS=windows GOARCH=amd64 go build -o msig_sign_win_x64.exe cmd/sign/main.go
+    - name: Build sign win/amd64
+      run: env GOOS=windows GOARCH=amd64 go build -o msig_sign_win_amd64.exe cmd/sign/main.go
 
-    - name: Build sign linux/x64
-      run: env GOOS=linux GOARCH=amd64 go build -o msig_sign_linux_x64 cmd/sign/main.go
+    - name: Build sign linux/amd64
+      run: env GOOS=linux GOARCH=amd64 go build -o msig_sign_linux_amd64 cmd/sign/main.go
 
-    - name: Build sign darwin/x64
-      run: env GOOS=darwin GOARCH=amd64 go build -o msig_sign_darwin_x64 cmd/sign/main.go
+    - name: Build sign darwin/amd64
+      run: env GOOS=darwin GOARCH=amd64 go build -o msig_sign_darwin_amd64 cmd/sign/main.go
 
     - name: Build sign darwin/arm64
       run: env GOOS=darwin GOARCH=arm64 go build -o msig_sign_darwin_arm64 cmd/sign/main.go
@@ -56,5 +56,5 @@ jobs:
       with:
         allowUpdates: true
         tag: dev
-        artifacts: "msig_wallet_win_x64.exe,msig_wallet_linux_x64,msig_wallet_darwin_x64,msig_wallet_darwin_arm64,msig_sign_win_x64.exe,msig_sign_linux_x64,msig_sign_darwin_x64,msig_sign_darwin_arm64,version"
+        artifacts: "msig_wallet_win_amd64.exe,msig_wallet_linux_amd64,msig_wallet_darwin_amd64,msig_wallet_darwin_arm64,msig_sign_win_amd64.exe,msig_sign_linux_amd64,msig_sign_darwin_amd64,msig_sign_darwin_arm64,version"
         prerelease: true
