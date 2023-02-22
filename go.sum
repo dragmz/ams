@@ -5,8 +5,8 @@ github.com/algorand/go-codec/codec v1.1.9/go.mod h1:YkEx5nmr/zuCeaDYOIhlDg92Lxju
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dragmz/wc v0.0.0-20230222000003-5f9155bea741 h1:UToYL/JirFiLfwIYhYWuMvtYOv6c8eBcaa+1Mu3M0uA=
-github.com/dragmz/wc v0.0.0-20230222000003-5f9155bea741/go.mod h1:nFljT6Ha3cz5nGjTgVSAaXucUEfsa3weY3ZY6bRiEwo=
+github.com/dragmz/wc v0.0.0-20230222000903-7499f70a62b6 h1:BV1AR2B/jffNn+RkCkJwcyLRPXqRUsIpBow/L+k44hE=
+github.com/dragmz/wc v0.0.0-20230222000903-7499f70a62b6/go.mod h1:hgjLRRtuMEtxWQqpaKholznVDUy6v1OkNGAZiayagWs=
 github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
 github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/gorilla/websocket v1.5.0 h1:PPwGk2jz7EePpoHN/+ClbZu8SPxiqlu12wZP/3sWmnc=
