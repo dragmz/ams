@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/algorand/go-algorand-sdk/mnemonic"
 	"github.com/algorand/go-algorand-sdk/types"
 	"github.com/dragmz/ams"
+	"github.com/dragmz/wc"
 	"github.com/pkg/errors"
 )
 
@@ -19,6 +21,45 @@ type args struct {
 	Addresses string
 	Threshold int
 	Txn       string
+	Debug     bool
+	Uri       string
+}
+
+type manualConfirmSignerWrapper struct {
+	s wc.Signer
+	r *bufio.Reader
+}
+
+func (s *manualConfirmSignerWrapper) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignResponse, error) {
+	fmt.Println("Incoming transactions:")
+
+	if len(req.Params) > 0 {
+		p := req.Params[0]
+		for _, item := range p {
+			bs, err := base64.StdEncoding.DecodeString(item.TxnBase64)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to base64 decode transaction")
+			}
+
+			var txn types.Transaction
+			err = msgpack.Decode(bs, &txn)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to decode transaction msgpack")
+			}
+
+			fmt.Println(ams.FormatTxn(txn))
+		}
+	}
+
+	// TODO: decode and display transactions
+	fmt.Println("Press Enter to sign transactions..")
+	s.r.ReadString('\n')
+
+	return s.s.Sign(req)
+}
+
+func (s *manualConfirmSignerWrapper) Address() string {
+	return s.s.Address()
 }
 
 func run(a args) error {
@@ -53,47 +94,46 @@ func run(a args) error {
 		return errors.Wrap(err, "failed to convert mnemonic to private key")
 	}
 
+	acc, err := crypto.AccountFromPrivateKey(sk)
+	if err != nil {
+		return errors.Wrap(err, "failed to convert private key to account")
+	}
+
 	rdr := bufio.NewReader(os.Stdin)
 
-	var txnstr = a.Txn
-	if txnstr == "" {
-		fmt.Println("Enter transaction base32:")
-		txnstr, err = ams.ReadInput(rdr)
-		if err != nil {
-			return errors.Wrap(err, "failed to read transaction data")
-		}
-	}
-
-	bs, err := ams.TxnTransferEncoding.DecodeString(txnstr)
+	uri, err := wc.ParseUri(a.Uri)
 	if err != nil {
-		return errors.Wrap(err, "failed to decode transaction data")
+		return errors.Wrap(err, "failed to parse uri")
 	}
 
-	var tx types.Transaction
-	err = msgpack.Decode(bs, &tx)
-	if err != nil {
-		return errors.Wrap(err, "failed to decode transaction msgpack")
-	}
-
-	fmt.Println("- Transaction Details -")
-	fmt.Println(ams.FormatTxn(tx))
-	fmt.Println("Press Enter to sign the transaction..")
-	rdr.ReadString('\n')
-
-	var stx []byte
+	sopts := []wc.LocalSignerOption{}
 
 	if len(addrs) > 1 {
-		_, stx, err = crypto.SignMultisigTransaction(sk, ma, tx)
-	} else {
-		_, stx, err = crypto.SignTransaction(sk, tx)
+		sopts = append(sopts,
+			wc.WithLocalSignerMultisigAccount(ma))
 	}
 
+	signer, err := wc.MakeLocalSigner(acc, sopts...)
 	if err != nil {
-		return errors.Wrap(err, "failed to sign transaction")
+		return errors.Wrap(err, "failed to make signer")
 	}
 
-	fmt.Println("Signed txn base32:")
-	fmt.Println(ams.TxnTransferEncoding.EncodeToString(stx))
+	signer = &manualConfirmSignerWrapper{
+		s: signer,
+		r: rdr,
+	}
+
+	wallet, err := wc.MakeServer(uri, signer,
+		wc.WithServerDebug(a.Debug),
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to make wallet")
+	}
+
+	err = wallet.Run()
+	if err != nil {
+		return errors.Wrap(err, "failed to run wallet")
+	}
 
 	return nil
 }
@@ -105,6 +145,8 @@ func main() {
 	flag.StringVar(&a.Addresses, "addr", "", "multisig addresses")
 	flag.IntVar(&a.Threshold, "threshold", 0, "multisig threshold")
 	flag.StringVar(&a.Txn, "txn", "", "base32 transaction data")
+	flag.BoolVar(&a.Debug, "debug", false, "debug mode")
+	flag.StringVar(&a.Uri, "uri", "", "WalletConnect uri")
 
 	flag.Parse()
 
