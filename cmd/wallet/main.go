@@ -7,8 +7,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/algorand/go-algorand-sdk/crypto"
+	"github.com/algorand/go-algorand-sdk/encoding/msgpack"
+	"github.com/algorand/go-algorand-sdk/types"
 	"github.com/dragmz/ams"
 	"github.com/dragmz/tqr"
 	"github.com/dragmz/wc"
@@ -20,6 +23,7 @@ type args struct {
 	Address   string
 	Threshold uint
 	Debug     bool
+	Paths     pathsArg
 }
 
 type AlgoSignTxnRequestParams struct {
@@ -186,13 +190,19 @@ func run(a args) error {
 		addr = accs[0].String()
 	}
 
-	u, err := wc.ParseUri(a.Uri)
-	if err != nil {
-		return err
-	}
+	var u *wc.Uri
+	if len(a.Uri) > 0 {
+		uu, err := wc.ParseUri(a.Uri)
+		if err != nil {
+			return err
+		}
 
-	if a.Debug {
-		fmt.Println("Uri:", u)
+		// TODO: refactor wc.ParseUri to return *
+		u = &uu
+
+		if a.Debug {
+			fmt.Println("Uri:", u)
+		}
 	}
 
 	meta := wc.SessionRequestPeerMeta{
@@ -279,20 +289,86 @@ func run(a args) error {
 		debug: a.Debug,
 	}
 
-	w, err := wc.MakeServer(u, s,
-		wc.WithServerDebug(a.Debug),
-	)
-	if err != nil {
-		return errors.Wrap(err, "failed to make server")
+	if u != nil {
+		w, err := wc.MakeServer(*u, s,
+			wc.WithServerDebug(a.Debug),
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to make server")
+		}
+
+		for {
+			err := w.Run()
+			if err != nil {
+				return err
+			}
+		}
+	} else if len(a.Paths) > 0 {
+		var txs []types.Transaction
+
+		for _, p := range a.Paths {
+			bs, err := os.ReadFile(p)
+			if err != nil {
+				return errors.Wrap(err, "failed to read transaction from file")
+			}
+
+			var ustx types.SignedTxn
+			err = msgpack.Decode(bs, &ustx)
+			if err != nil {
+				return errors.Wrap(err, "failed to decode transaction msgpack")
+			}
+
+			// TODO: check if signed
+
+			txs = append(txs, ustx.Txn)
+		}
+
+		for _, txn := range txs {
+			fmt.Println(ams.FormatTxn(txn))
+		}
+
+		fmt.Println("Press Enter to sign the transactions..")
+		rdr.ReadString('\n')
+
+		req := wc.AlgoSignRequest{
+			Params: [][]wc.AlgoSignParams{
+				{},
+			},
+		}
+
+		for _, txn := range txs {
+			b64 := base64.StdEncoding.EncodeToString(msgpack.Encode(txn))
+			req.Params[0] = append(req.Params[0], wc.AlgoSignParams{
+				TxnBase64: b64,
+			})
+		}
+
+		resp, err := s.Sign(req)
+		if err != nil {
+			return errors.Wrap(err, "failed to sign transactions")
+		}
+
+		fmt.Println("Signed transactions:")
+		fmt.Println(resp)
+	} else {
+		return errors.New("No transactions input specified. Must be either uri or path(s).")
 	}
 
-	for {
-		err := w.Run()
-		if err != nil {
-			return err
-		}
-	}
+	return nil
 }
+
+type pathsArg []string
+
+func (i *pathsArg) String() string {
+	return strings.Join(*i, ",")
+}
+
+func (i *pathsArg) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
+
+var myFlags pathsArg
 
 func main() {
 	var a args
@@ -301,6 +377,7 @@ func main() {
 	flag.StringVar(&a.Address, "addr", "", "Algorand account address")
 	flag.UintVar(&a.Threshold, "threshold", 1, "Multisig threshold")
 	flag.BoolVar(&a.Debug, "debug", false, "debug mode")
+	flag.Var(&a.Paths, "path", "transactions input paths")
 	flag.Parse()
 
 	err := run(a)

@@ -24,7 +24,7 @@ func FormatTxn(txn types.Transaction) string {
 
 	case types.AssetTransferTx:
 		out.WriteString(fmt.Sprintf("Receiver: %s\n", txn.AssetReceiver))
-		out.WriteString(fmt.Sprintf("Amount: %d base units of ASA\n", txn.AssetAmount))
+		out.WriteString(fmt.Sprintf("Amount: %d base units of ASA #%d\n", txn.AssetAmount, txn.XferAsset))
 		if !txn.AssetCloseTo.IsZero() {
 			out.WriteString(fmt.Sprintf("Close to: %s\n", txn.AssetCloseTo.String()))
 		}
