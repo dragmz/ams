@@ -9,9 +9,8 @@ import (
 	"os"
 
 	"github.com/algorand/go-algorand-sdk/crypto"
-	"github.com/algorand/go-algorand-sdk/encoding/msgpack"
-	"github.com/algorand/go-algorand-sdk/types"
 	"github.com/dragmz/ams"
+	"github.com/dragmz/tqr"
 	"github.com/dragmz/wc"
 	"github.com/pkg/errors"
 )
@@ -32,30 +31,9 @@ type AlgoSignTxnRequest struct {
 	Params [][]AlgoSignTxnRequestParams `json:"params"`
 }
 
-func signTransctionFromInput(txn types.Transaction, rdr *bufio.Reader) ([]byte, error) {
-	fmt.Println("Transaction base32:")
-
-	bs := msgpack.Encode(txn)
-
-	fmt.Println(ams.TxnTransferEncoding.EncodeToString(bs))
-	fmt.Println("Enter signed transaction base32 (or file path with < prefix, e.g. <txn1):")
-
-	pstx32, err := ams.ReadInput(rdr)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read transaction input")
-	}
-
-	pstx, err := ams.TxnTransferEncoding.DecodeString(pstx32)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode transaction")
-	}
-
-	return pstx, nil
-}
-
 type proxySigner struct {
 	r    *bufio.Reader
-	pus  []peerUri
+	pus  []*wc.Peer
 	ma   *crypto.MultisigAccount
 	addr string
 
@@ -70,9 +48,9 @@ func (s *proxySigner) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignResponse, error)
 		if s.debug {
 			fmt.Println("Peer sign request:", pu)
 		}
-		go func(pu peerUri) {
+		go func(p *wc.Peer) {
 			func() {
-				pstxs, err := pu.Peer.SignTransactions(req)
+				pstxs, err := p.SignTransactions(req)
 				if err != nil {
 					cancel(errors.Wrap(err, "failed to sign transactions"))
 				}
@@ -170,11 +148,6 @@ func (s *proxySigner) Address() string {
 	return s.addr
 }
 
-type peerUri struct {
-	Uri  wc.Uri
-	Peer *wc.Peer
-}
-
 func run(a args) error {
 	if a.Threshold == 0 {
 		return errors.New("threshold must be >= 0")
@@ -227,7 +200,7 @@ func run(a args) error {
 	}
 
 	ech := make(chan error)
-	puch := make(chan peerUri)
+	puch := make(chan *wc.Peer)
 
 	min := len(ma.Pks)
 	if min == 0 {
@@ -236,15 +209,29 @@ func run(a args) error {
 
 	fmt.Printf("Signers sessions (need %d of %d):\n", min, len(accs))
 
+	uch := make(chan wc.Uri)
+
+	go func() {
+		for {
+			u, ok := <-uch
+			if !ok {
+				return
+			}
+
+			s := u.String()
+
+			fmt.Println(tqr.New(s))
+			fmt.Println(s)
+		}
+	}()
+
 	for i := 0; i < min; i++ {
 		go func(i int) {
 			err := func() error {
-				var u wc.Uri
 				client, err := wc.MakeClient(
 					wc.WithClientDebug(a.Debug),
 					wc.WithClientUrlHandler(func(uri wc.Uri) error {
-						u = uri
-						fmt.Println(uri)
+						uch <- uri
 						return nil
 					}))
 				if err != nil {
@@ -256,10 +243,7 @@ func run(a args) error {
 					return errors.Wrap(err, "failed to request session")
 				}
 
-				puch <- peerUri{
-					Uri:  u,
-					Peer: peer,
-				}
+				puch <- peer
 
 				return nil
 			}()
@@ -270,7 +254,7 @@ func run(a args) error {
 		}(i)
 	}
 
-	var pus []peerUri
+	var pus []*wc.Peer
 
 	for i := 0; i < min; i++ {
 		select {
