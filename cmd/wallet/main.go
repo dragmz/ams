@@ -44,8 +44,18 @@ type proxySigner struct {
 	debug bool
 }
 
+type peerPartial struct {
+	Partial [][]byte
+	Address string
+}
+
+type peerAddr struct {
+	Peer    *wc.Peer
+	Address string
+}
+
 func (s *proxySigner) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignResponse, error) {
-	psch := make(chan [][]byte)
+	psch := make(chan peerPartial)
 	ctx, cancel := context.WithCancelCause(context.Background())
 
 	for i, pu := range s.pa {
@@ -68,7 +78,10 @@ func (s *proxySigner) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignResponse, error)
 				}
 
 				select {
-				case psch <- pstxs:
+				case psch <- peerPartial{
+					Partial: pstxs,
+					Address: p.Address,
+				}:
 				case <-ctx.Done():
 				}
 
@@ -81,7 +94,7 @@ func (s *proxySigner) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignResponse, error)
 		}(i, pu)
 	}
 
-	var all [][][]byte
+	var all []peerPartial
 
 	var min int
 	if s.ma != nil {
@@ -97,11 +110,11 @@ func (s *proxySigner) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignResponse, error)
 
 	for i := 0; i < min; i++ {
 		select {
-		case partial := <-psch:
+		case pp := <-psch:
 			if s.debug {
-				fmt.Println("Received response:", len(partial))
+				fmt.Println("Received response - address:", pp.Address, ", len:", len(pp.Partial))
 			}
-			all = append(all, partial)
+			all = append(all, pp)
 		case <-ctx.Done():
 			return nil, errors.Wrap(ctx.Err(), "Failed to sign transactions")
 		}
@@ -127,16 +140,16 @@ func (s *proxySigner) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignResponse, error)
 
 	var count int
 
-	for _, partial := range all {
-		curr := len(partial)
+	for _, pp := range all {
+		curr := len(pp.Partial)
 		if count < curr {
 			count = curr
 		}
 	}
 
-	for _, partial := range all {
-		if len(partial) != count {
-			return nil, errors.Errorf("Received invalid number of partial transactions - got: %d, expected: %d", len(partial), count)
+	for _, pp := range all {
+		if len(pp.Partial) != count {
+			return nil, errors.Errorf("Received invalid number of partial transactions - got: %d, expected: %d, addr:", len(pp.Partial), count, pp.Address)
 		}
 	}
 
@@ -145,13 +158,31 @@ func (s *proxySigner) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignResponse, error)
 	for i := 0; i < count; i++ {
 		var partial [][]byte
 
-		for _, signer := range all {
-			partial = append(partial, signer[i])
+		for _, pp := range all {
+			partial = append(partial, pp.Partial[i])
 		}
 
 		if s.ma != nil {
-			for i, txn := range partial {
-				mstx, err := ams.ConvertToMultisig(txn, *s.ma)
+			for i, bs := range partial {
+				var txn types.SignedTxn
+				err := msgpack.Decode(bs, &txn)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to decode signed transaction msgpack")
+				}
+
+				if txn.AuthAddr.IsZero() {
+					a, err := types.DecodeAddress(all[i].Address)
+					if err != nil {
+						return nil, errors.Wrap(err, "failed to decode addr")
+					}
+
+					// TODO: I'm not sure about it but needed for Exodus that does not set it
+					txn.AuthAddr = a
+
+					bs = msgpack.Encode(txn)
+				}
+
+				mstx, err := ams.ConvertToMultisig(bs, *s.ma)
 				if err != nil {
 					return nil, errors.Wrap(err, "failed to convert to multisig")
 				}
@@ -179,16 +210,6 @@ func (s *proxySigner) Address() string {
 	return s.addr
 }
 
-type peerAddr struct {
-	Peer    *wc.Peer
-	Address string
-}
-
-type peerResult struct {
-	Peer   *wc.Peer
-	Result wc.SessionRequestResponseResult
-}
-
 func run(a args) error {
 	if a.Threshold == 0 {
 		return errors.New("threshold must be >= 0")
@@ -200,17 +221,21 @@ func run(a args) error {
 	}
 
 	if len(accs) == 0 {
-		return errors.New("missing address")
-	}
-
-	if len(accs) < int(a.Threshold) {
+		if a.Threshold != 1 {
+			return errors.New("missing address")
+		}
+	} else if len(accs) < int(a.Threshold) {
 		return errors.New("number of addresses is less than the threshold")
 	}
 
 	var addr string
 	var ma *crypto.MultisigAccount
 
-	if len(accs) > 1 {
+	switch len(accs) {
+	case 0:
+	case 1:
+		addr = accs[0].String()
+	default:
 		mma, err := crypto.MultisigAccountWithParams(1, uint8(a.Threshold), accs)
 		if err != nil {
 			return err
@@ -224,8 +249,6 @@ func run(a args) error {
 		ma = &mma
 
 		fmt.Println("Multisig:", addr)
-	} else {
-		addr = accs[0].String()
 	}
 
 	var u *wc.Uri
@@ -245,14 +268,6 @@ func run(a args) error {
 
 	meta := wc.SessionRequestPeerMeta{
 		Name: "AMS",
-	}
-
-	var min int
-	if ma != nil {
-		min = len(ma.Pks)
-	}
-	if min == 0 {
-		min = 1
 	}
 
 	uch := make(chan wc.Uri)
@@ -279,8 +294,8 @@ func run(a args) error {
 	var pa []peerAddr
 	var tries uint
 
-	for len(pa) < min {
-		fmt.Printf("Signers - need: %d / %d, got: %d, tries: %d:\n", min, len(accs), len(pa), tries)
+	for len(pa) < int(a.Threshold) {
+		fmt.Printf("Signers - need: %d / %d, got: %d, tries: %d:\n", a.Threshold, len(accs), len(pa), tries)
 
 		client, err := wc.MakeClient(
 			wc.WithClientDebug(a.Debug),
@@ -299,8 +314,9 @@ func run(a args) error {
 
 		tries++
 
+		// TODO: supports first address only
 		for _, addr := range res.Accounts {
-			if addrs_left[addr] {
+			if addrs_left[addr] || len(accs) == 0 {
 				delete(addrs_left, addr)
 				pa = append(pa, peerAddr{
 					Peer:    peer,
@@ -311,6 +327,10 @@ func run(a args) error {
 		}
 
 		// TODO: disconnect if not accepted
+	}
+
+	if len(addr) == 0 {
+		addr = pa[0].Address
 	}
 
 	rdr := bufio.NewReader(os.Stdin)
