@@ -149,7 +149,7 @@ func (s *proxySigner) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignResponse, error)
 
 	for _, pp := range all {
 		if len(pp.Partial) != count {
-			return nil, errors.Errorf("Received invalid number of partial transactions - got: %d, expected: %d, addr:", len(pp.Partial), count, pp.Address)
+			return nil, errors.Errorf("Received invalid number of partial transactions - got: %d, expected: %d, addr: %s", len(pp.Partial), count, pp.Address)
 		}
 	}
 
