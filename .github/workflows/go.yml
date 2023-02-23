@@ -25,28 +25,28 @@ jobs:
       run: go test -v ./...
 
     - name: Build wallet win/amd64
-      run: env GOOS=windows GOARCH=amd64 go build -o ams_wallet_win_amd64.exe cmd/wallet/main.go
+      run: env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o ams_wallet_win_amd64.exe cmd/wallet/main.go
 
     - name: Build wallet linux/amd64
-      run: env GOOS=linux GOARCH=amd64 go build -o ams_wallet_linux_amd64 cmd/wallet/main.go
+      run: env GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o ams_wallet_linux_amd64 cmd/wallet/main.go
 
     - name: Build wallet darwin/amd64
-      run: env GOOS=darwin GOARCH=amd64 go build -o ams_wallet_darwin_amd64 cmd/wallet/main.go
+      run: env GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o ams_wallet_darwin_amd64 cmd/wallet/main.go
 
     - name: Build wallet darwin/arm64
-      run: env GOOS=darwin GOARCH=arm64 go build -o ams_wallet_darwin_arm64 cmd/wallet/main.go
+      run: env GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o ams_wallet_darwin_arm64 cmd/wallet/main.go
 
     - name: Build sign win/amd64
-      run: env GOOS=windows GOARCH=amd64 go build -o ams_sign_win_amd64.exe cmd/sign/main.go
+      run: env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o ams_sign_win_amd64.exe cmd/sign/main.go
 
     - name: Build sign linux/amd64
-      run: env GOOS=linux GOARCH=amd64 go build -o ams_sign_linux_amd64 cmd/sign/main.go
+      run: env GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o ams_sign_linux_amd64 cmd/sign/main.go
 
     - name: Build sign darwin/amd64
-      run: env GOOS=darwin GOARCH=amd64 go build -o ams_sign_darwin_amd64 cmd/sign/main.go
+      run: env GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o ams_sign_darwin_amd64 cmd/sign/main.go
 
     - name: Build sign darwin/arm64
-      run: env GOOS=darwin GOARCH=arm64 go build -o ams_sign_darwin_arm64 cmd/sign/main.go
+      run: env GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o ams_sign_darwin_arm64 cmd/sign/main.go
 
     - name: Prepare version file
       run: echo $GITHUB_SHA > version
