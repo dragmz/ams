@@ -44,7 +44,9 @@ func WithProxySignerPeersCallback(cb ProxyPeerAddrCallback) ProxySignerOption {
 }
 
 func MakeProxySigner(addr string, opts ...ProxySignerOption) (*ProxySigner, error) {
-	s := &ProxySigner{}
+	s := &ProxySigner{
+		addr: addr,
+	}
 
 	for _, opt := range opts {
 		opt(s)

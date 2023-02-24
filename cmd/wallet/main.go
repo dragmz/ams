@@ -1,18 +1,13 @@
 package main
 
 import (
-	"bufio"
-	"context"
-	"encoding/base64"
 	"flag"
 	"fmt"
-	"os"
 	"strings"
+	"sync"
 
 	"github.com/algorand/go-algorand-sdk/client/v2/algod"
 	"github.com/algorand/go-algorand-sdk/crypto"
-	"github.com/algorand/go-algorand-sdk/encoding/msgpack"
-	"github.com/algorand/go-algorand-sdk/types"
 	"github.com/dragmz/ams"
 	"github.com/dragmz/tqr"
 	"github.com/dragmz/wc"
@@ -158,86 +153,11 @@ func run(a args) error {
 			return pa
 		}),
 	)
-
 	if err != nil {
 		return errors.Wrap(err, "failed to create proxy signer")
 	}
 
-	if len(a.Paths) > 0 {
-		var txs []types.Transaction
-
-		for _, p := range a.Paths {
-			bs, err := os.ReadFile(p)
-			if err != nil {
-				return errors.Wrap(err, "failed to read transaction from file")
-			}
-
-			var ustx types.SignedTxn
-			err = msgpack.Decode(bs, &ustx)
-			if err != nil {
-				return errors.Wrap(err, "failed to decode transaction msgpack")
-			}
-
-			// TODO: check if signed
-
-			txs = append(txs, ustx.Txn)
-		}
-
-		for _, txn := range txs {
-			fmt.Println(ams.FormatTxn(txn))
-		}
-
-		fmt.Println("Press Enter to sign transactions..")
-		rdr := bufio.NewReader(os.Stdin)
-		rdr.ReadString('\n')
-
-		req := wc.AlgoSignRequest{
-			Params: [][]wc.AlgoSignParams{
-				{},
-			},
-		}
-
-		for _, txn := range txs {
-			b64 := base64.StdEncoding.EncodeToString(msgpack.Encode(txn))
-			req.Params[0] = append(req.Params[0], wc.AlgoSignParams{
-				TxnBase64: b64,
-			})
-		}
-
-		resp, err := s.Sign(req)
-		if err != nil {
-			return errors.Wrap(err, "failed to sign transactions")
-		}
-
-		fmt.Println("Sending signed transactions..")
-
-		if a.Debug {
-			fmt.Println(resp)
-		}
-
-		ac, err := algod.MakeClient(a.Algod, a.AlgodToken)
-		if err != nil {
-			return errors.Wrap(err, "failed to make algod client")
-		}
-
-		var group []byte
-
-		for _, b64 := range resp.Result {
-			bs, err := base64.StdEncoding.DecodeString(b64)
-			if err != nil {
-				return errors.Wrap(err, "failed to decode transaction")
-			}
-
-			group = append(group, bs...)
-		}
-
-		id, err := ac.SendRawTransaction(group).Do(context.Background())
-		if err != nil {
-			return errors.Wrap(err, "failed to send transactions")
-		}
-
-		fmt.Println("Id:", id)
-	}
+	var runners []ams.Runner
 
 	if u != nil {
 		w, err := wc.MakeServer(*u, s,
@@ -247,13 +167,49 @@ func run(a args) error {
 			return errors.Wrap(err, "failed to make server")
 		}
 
-		for {
-			err := w.Run()
-			if err != nil {
-				return err
-			}
-		}
+		runners = append(runners, w)
 	}
+
+	if len(a.Paths) > 0 {
+		ac, err := algod.MakeClient(a.Algod, a.AlgodToken)
+		if err != nil {
+			return errors.Wrap(err, "failed to make algod client")
+		}
+
+		r, err := ams.MakeFsRunner(a.Paths,
+			ams.WithFsRunnerDebug(a.Debug),
+			ams.WithFsRunnerAlgod(ac),
+			ams.WithFsRunnerSigner(s),
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to make paths source")
+		}
+
+		runners = append(runners, r)
+	}
+
+	var swg sync.WaitGroup
+	for _, r := range runners {
+		swg.Add(1)
+
+		go func(r ams.Runner) {
+			defer swg.Done()
+
+			err := func() error {
+				err := r.Run()
+				if err != nil {
+					return errors.Wrap(err, "failed to run")
+				}
+				return nil
+			}()
+
+			if err != nil {
+				fmt.Println("Runner error:", err)
+			}
+		}(r)
+	}
+
+	swg.Wait()
 
 	return nil
 }
