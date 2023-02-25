@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/algorand/go-algorand-sdk v1.24.0
 	github.com/dragmz/tqr v0.0.0-20221017230537-9456828a0212
-	github.com/dragmz/wc v0.0.0-20230224223825-a16fb60f370b
+	github.com/dragmz/wc v0.0.0-20230225223148-746cf6306b70
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.8.1
 )

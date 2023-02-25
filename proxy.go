@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"sync"
 
 	"github.com/algorand/go-algorand-sdk/crypto"
 	"github.com/algorand/go-algorand-sdk/encoding/msgpack"
@@ -65,46 +66,65 @@ type PeerAddr struct {
 	Address string
 }
 
+func (pa PeerAddr) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignResponse, error) {
+	return pa.Peer.Sign(context.Background(), req)
+}
+
 func (s *ProxySigner) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignResponse, error) {
 	psch := make(chan peerPartial)
 	ctx, cancel := context.WithCancelCause(context.Background())
 
+	var wg sync.WaitGroup
 	pa := s.pcb()
-	for i, pu := range pa {
-		if s.debug {
-			fmt.Println("Peer sign request:", pu)
-		}
-		go func(i int, p PeerAddr) {
-			err := func() error {
-				if s.debug {
-					fmt.Println("Requesting sign - peer:", p)
-				}
 
-				for i := 0; i < len(req.Params[0]); i++ {
-					req.Params[0][i].AuthAddr = p.Address
-				}
-
-				pstxs, err := p.Peer.SignTransactions(req)
-				if err != nil {
-					return errors.Wrapf(err, "failed to sign transactions - addr: %s, peer: %v", p.Address, p.Peer)
-				}
-
-				select {
-				case psch <- peerPartial{
-					Partial: pstxs,
-					Address: p.Address,
-				}:
-				case <-ctx.Done():
-				}
-
-				return nil
-			}()
-
-			if err != nil {
-				cancel(err)
+	go func() {
+		for i, pu := range pa {
+			if s.debug {
+				fmt.Println("Peer sign request:", pu)
 			}
-		}(i, pu)
-	}
+
+			// TODO: make sequential processing optional
+			wg.Add(1)
+
+			go func(i int, p PeerAddr) {
+				err := func() error {
+					if s.debug {
+						fmt.Println("Requesting sign - peer:", p)
+					}
+
+					for i := 0; i < len(req.Params[0]); i++ {
+						req.Params[0][i].AuthAddr = p.Address
+					}
+
+					resp, err := p.Sign(req)
+					if err != nil {
+						return errors.Wrapf(err, "failed to sign transactions - addr: %s, peer: %v", p.Address, p.Peer)
+					}
+
+					pstxs, err := wc.DecodeAlgoSignResponse(*resp)
+					if err != nil {
+						return errors.Wrap(err, "failed to decode sign response transactions")
+					}
+
+					select {
+					case psch <- peerPartial{
+						Partial: pstxs,
+						Address: p.Address,
+					}:
+					case <-ctx.Done():
+					}
+
+					return nil
+				}()
+
+				if err != nil {
+					cancel(err)
+				}
+			}(i, pu)
+
+			wg.Wait()
+		}
+	}()
 
 	var all []peerPartial
 
@@ -121,12 +141,16 @@ func (s *ProxySigner) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignResponse, error)
 	}
 
 	for i := 0; i < min; i++ {
+		// TODO: make this run as long as there aren't enough signed partials
+		// The loop here should handle sign errors and let the failed signer retry
+		// Additionally, could let other signers join too (needs changes to the Signer implementation)
 		select {
 		case pp := <-psch:
 			if s.debug {
 				fmt.Println("Received response - address:", pp.Address, ", len:", len(pp.Partial))
 			}
 			all = append(all, pp)
+			wg.Done()
 		case <-ctx.Done():
 			return nil, errors.Wrap(ctx.Err(), "Failed to sign transactions")
 		}
