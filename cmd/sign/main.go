@@ -18,11 +18,12 @@ import (
 
 type args struct {
 	Mnemonic  string
-	Addresses string
+	Addr      string
 	Threshold int
 	Txn       string
 	Debug     bool
 	Uri       string
+	AuthAddr  string
 }
 
 type manualConfirmSignerWrapper struct {
@@ -63,7 +64,7 @@ func (s *manualConfirmSignerWrapper) Address() string {
 }
 
 func run(a args) error {
-	addrs, err := ams.ParseAddrs(a.Addresses, ",")
+	addrs, err := ams.ParseAddrs(a.Addr, ",")
 	if err != nil {
 		return errors.Wrap(err, "failed to parse addresses")
 	}
@@ -79,12 +80,12 @@ func run(a args) error {
 			return errors.Wrap(err, "failed to build multisig account")
 		}
 
-		addr, err := ma.Address()
+		maddr, err := ma.Address()
 		if err != nil {
 			return errors.Wrap(err, "failed to get multisig address")
 		}
 
-		fmt.Println("Multisig address:", addr)
+		fmt.Println("Multisig address:", maddr)
 	} else {
 		fmt.Println("Address:", addrs[0])
 	}
@@ -106,14 +107,14 @@ func run(a args) error {
 		return errors.Wrap(err, "failed to parse uri")
 	}
 
-	sopts := []wc.LocalSignerOption{}
+	sopts := []ams.LocalSignerOption{}
 
 	if len(addrs) > 1 {
 		sopts = append(sopts,
-			wc.WithLocalSignerMultisigAccount(ma))
+			ams.WithLocalSignerMultisigAccount(ma))
 	}
 
-	signer, err := wc.MakeLocalSigner(acc, sopts...)
+	signer, err := ams.MakeLocalSigner(acc, sopts...)
 	if err != nil {
 		return errors.Wrap(err, "failed to make signer")
 	}
@@ -142,11 +143,12 @@ func main() {
 	var a args
 
 	flag.StringVar(&a.Mnemonic, "mnemonic", "", "private key mnemonic")
-	flag.StringVar(&a.Addresses, "addr", "", "multisig addresses")
+	flag.StringVar(&a.Addr, "addr", "", "multisig addresses")
 	flag.IntVar(&a.Threshold, "threshold", 0, "multisig threshold")
 	flag.StringVar(&a.Txn, "txn", "", "base32 transaction data")
 	flag.BoolVar(&a.Debug, "debug", false, "debug mode")
 	flag.StringVar(&a.Uri, "uri", "", "WalletConnect uri")
+	flag.StringVar(&a.AuthAddr, "auth-addr", "", "Algorand auth address")
 
 	flag.Parse()
 
