@@ -20,29 +20,21 @@ type LocalSigner struct {
 	sk   ed25519.PrivateKey
 	ma   *crypto.MultisigAccount
 	addr string
-	auth string
 }
 
 type LocalSignerOption func(s *LocalSigner) error
 
-func MakeLocalSigner(acc crypto.Account, opts ...LocalSignerOption) (Signer, error) {
+func MakeLocalSigner(addr string, sk ed25519.PrivateKey, opts ...LocalSignerOption) (Signer, error) {
 	s := &LocalSigner{}
 
 	for _, opt := range opts {
 		opt(s)
 	}
 
-	s.sk = acc.PrivateKey
-	s.addr = acc.Address.String()
+	s.sk = sk
+	s.addr = addr
 
 	return s, nil
-}
-
-func WithLocalSignerAuthAddress(authAddr string) LocalSignerOption {
-	return func(s *LocalSigner) error {
-		s.auth = authAddr
-		return nil
-	}
 }
 
 func WithLocalSignerMultisigAccount(ma crypto.MultisigAccount) LocalSignerOption {
@@ -60,11 +52,7 @@ func WithLocalSignerMultisigAccount(ma crypto.MultisigAccount) LocalSignerOption
 }
 
 func (s *LocalSigner) Address() string {
-	if len(s.auth) > 0 {
-		return s.auth
-	} else {
-		return s.addr
-	}
+	return s.addr
 }
 
 func (s *LocalSigner) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignResponse, error) {

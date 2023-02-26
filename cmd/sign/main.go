@@ -73,6 +73,8 @@ func run(a args) error {
 		return errors.New("missing address")
 	}
 
+	var addr string
+
 	var ma crypto.MultisigAccount
 	if len(addrs) > 1 {
 		ma, err = crypto.MultisigAccountWithParams(1, uint8(a.Threshold), addrs)
@@ -86,8 +88,10 @@ func run(a args) error {
 		}
 
 		fmt.Println("Multisig address:", maddr)
+		addr = maddr.String()
 	} else {
 		fmt.Println("Address:", addrs[0])
+		addr = addrs[0].String()
 	}
 
 	sk, err := mnemonic.ToPrivateKey(a.Mnemonic)
@@ -114,7 +118,7 @@ func run(a args) error {
 			ams.WithLocalSignerMultisigAccount(ma))
 	}
 
-	signer, err := ams.MakeLocalSigner(acc, sopts...)
+	signer, err := ams.MakeLocalSigner(addr, acc.PrivateKey, sopts...)
 	if err != nil {
 		return errors.Wrap(err, "failed to make signer")
 	}

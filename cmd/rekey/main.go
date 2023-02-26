@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"strings"
 
 	"github.com/algorand/go-algorand-sdk/client/v2/algod"
 	"github.com/algorand/go-algorand-sdk/crypto"
@@ -27,6 +28,8 @@ func run(a args) error {
 		return errors.Wrap(err, "failed to make algod client")
 	}
 
+	a.Mnemonic = strings.ReplaceAll(a.Mnemonic, ",", " ")
+
 	sk, err := mnemonic.ToPrivateKey(a.Mnemonic)
 	if err != nil {
 		return errors.Wrap(err, "failed to convert mnemonic to private key")
@@ -36,6 +39,8 @@ func run(a args) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to convert private key to account")
 	}
+
+	fmt.Println("Rekeyed address:", acc.Address)
 
 	sp, err := ac.SuggestedParams().Do(context.Background())
 	if err != nil {

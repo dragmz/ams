@@ -50,7 +50,7 @@ func run(a args) error {
 		},
 		wc.WithClientConn(dapp),
 		wc.WithClientUrlHandler(func(uri wc.Uri) error {
-			signer, err := ams.MakeLocalSigner(acc,
+			signer, err := ams.MakeLocalSigner(acc.Address.String(), acc.PrivateKey,
 				ams.WithLocalSignerMultisigAccount(ma),
 			)
 			if err != nil {
