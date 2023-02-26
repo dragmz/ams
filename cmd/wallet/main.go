@@ -70,13 +70,10 @@ func run(a args) error {
 
 	var u *wc.Uri
 	if len(a.Uri) > 0 {
-		uu, err := wc.ParseUri(a.Uri)
+		u, err = wc.ParseUri(a.Uri)
 		if err != nil {
 			return err
 		}
-
-		// TODO: refactor wc.ParseUri to return *
-		u = &uu
 
 		if a.Debug {
 			fmt.Println("Uri:", u)

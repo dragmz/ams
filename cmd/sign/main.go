@@ -128,7 +128,7 @@ func run(a args) error {
 		r: rdr,
 	}
 
-	wallet, err := wc.MakeServer(uri, signer,
+	wallet, err := wc.MakeServer(*uri, signer,
 		wc.WithServerDebug(a.Debug),
 	)
 	if err != nil {
