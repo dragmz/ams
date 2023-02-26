@@ -56,7 +56,7 @@ func MakeFsRunner(paths []string, opts ...FsRunnerOption) (*FsRunner, error) {
 	return r, nil
 }
 
-func ReadRequestFromFiles(paths []string) (*wc.AlgoSignRequest, error) {
+func (r *FsRunner) ReadRequestFromFiles(paths []string) (*wc.AlgoSignRequest, error) {
 	var txs []types.Transaction
 
 	for _, p := range paths {
@@ -73,6 +73,10 @@ func ReadRequestFromFiles(paths []string) (*wc.AlgoSignRequest, error) {
 
 		// TODO: check if signed
 
+		if r.debug {
+			fmt.Printf("Path: %s, tx: %+v\n", p, ustx)
+		}
+
 		txs = append(txs, ustx.Txn)
 	}
 
@@ -83,8 +87,6 @@ func ReadRequestFromFiles(paths []string) (*wc.AlgoSignRequest, error) {
 	}
 
 	for _, txn := range txs {
-		fmt.Printf("%+v\n", txn)
-
 		b64 := base64.StdEncoding.EncodeToString(msgpack.Encode(txn))
 		req.Params[0] = append(req.Params[0], wc.AlgoSignParams{
 			TxnBase64: b64,
@@ -99,7 +101,7 @@ func (r *FsRunner) Run() error {
 		return nil
 	}
 
-	req, err := ReadRequestFromFiles(r.paths)
+	req, err := r.ReadRequestFromFiles(r.paths)
 	if err != nil {
 		return errors.Wrap(err, "failed to read transactions from files")
 	}
