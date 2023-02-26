@@ -7,8 +7,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dragmz/tqr v0.0.0-20221017230537-9456828a0212 h1:gRZ/hGUixbnXNnHRk3JwFhmW3vTyfvZvjRHbNmsfMNY=
 github.com/dragmz/tqr v0.0.0-20221017230537-9456828a0212/go.mod h1:FKXIBnAbEP/dAkFHlEw1T1OtTErWQNsOUkgtbxXesCw=
-github.com/dragmz/wc v0.0.0-20230226203737-a3605a05b3e9 h1:IO0p8AHLTSvVl1uSSi1OMFcWp7JpvzCGbpcLpvKSsyA=
-github.com/dragmz/wc v0.0.0-20230226203737-a3605a05b3e9/go.mod h1:hgjLRRtuMEtxWQqpaKholznVDUy6v1OkNGAZiayagWs=
+github.com/dragmz/wc v0.0.0-20230226222146-9f7d66fb732f h1:+FUdJJQTrDLEjx9Y6aoqQ5Y90OtrAn468oZ5jMreaIQ=
+github.com/dragmz/wc v0.0.0-20230226222146-9f7d66fb732f/go.mod h1:hgjLRRtuMEtxWQqpaKholznVDUy6v1OkNGAZiayagWs=
 github.com/google/go-cmp v0.5.2 h1:X2ev0eStA3AbceY54o37/0PQ/UWqKEiiO2dKL5OPaFM=
 github.com/google/go-cmp v0.5.2/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-querystring v1.1.0 h1:AnCroh3fv4ZBgVIf1Iwtovgjaw/GiKJo8M8yD/fhyJ8=
