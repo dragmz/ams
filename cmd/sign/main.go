@@ -24,6 +24,9 @@ type args struct {
 	Debug     bool
 	Uri       string
 	AuthAddr  string
+
+	ClipboardQrUri bool
+	ClipboardUri   bool
 }
 
 type manualConfirmSignerWrapper struct {
@@ -56,7 +59,14 @@ func (s *manualConfirmSignerWrapper) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignR
 	fmt.Println("Press Enter to sign transactions..")
 	s.r.ReadString('\n')
 
-	return s.s.Sign(req)
+	resp, err := s.s.Sign(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to sign transactions")
+	}
+
+	fmt.Println("Signed transactions.")
+
+	return resp, nil
 }
 
 func (s *manualConfirmSignerWrapper) Address() string {
@@ -106,7 +116,38 @@ func run(a args) error {
 
 	rdr := bufio.NewReader(os.Stdin)
 
-	uri, err := wc.ParseUri(a.Uri)
+	uris := 0
+	if len(a.Uri) > 0 {
+		uris++
+	}
+	if a.ClipboardQrUri {
+		uris++
+	}
+	if a.ClipboardUri {
+		uris++
+	}
+
+	if uris > 1 {
+		return errors.New("only one uri can be used")
+	}
+
+	uristr := a.Uri
+
+	if len(uristr) == 0 && a.ClipboardQrUri {
+		uristr, err = ams.ReadQrFromClipboard()
+		if err != nil {
+			return errors.Wrap(err, "failed to read uri from clipboard qr code")
+		}
+	}
+
+	if len(uristr) == 0 && a.ClipboardUri {
+		uristr, err = ams.ReadWcFromClipboard()
+		if err != nil {
+			return errors.Wrap(err, "Failed to read uri from clipboard")
+		}
+	}
+
+	uri, err := wc.ParseUri(uristr)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse uri")
 	}
@@ -153,6 +194,8 @@ func main() {
 	flag.BoolVar(&a.Debug, "debug", false, "debug mode")
 	flag.StringVar(&a.Uri, "uri", "", "WalletConnect uri")
 	flag.StringVar(&a.AuthAddr, "auth-addr", "", "Algorand auth address")
+	flag.BoolVar(&a.ClipboardQrUri, "cqu", false, "use WalletConnect uri from QR code in clipboard")
+	flag.BoolVar(&a.ClipboardUri, "cu", false, "use WalletConnect uri from clipboard")
 
 	flag.Parse()
 
