@@ -20,7 +20,9 @@ type args struct {
 
 	Paths pathsArg
 
-	Uri       string
+	Uri          string
+	ClipboardUri bool
+
 	Address   string
 	Threshold uint
 
@@ -28,10 +30,6 @@ type args struct {
 }
 
 func run(a args) error {
-	if len(a.Paths) == 0 && len(a.Uri) == 0 {
-		return errors.New("no transaction source specified")
-	}
-
 	if a.Threshold == 0 {
 		return errors.New("threshold must be >= 0")
 	}
@@ -69,8 +67,19 @@ func run(a args) error {
 	}
 
 	var u *wc.Uri
-	if len(a.Uri) > 0 {
-		u, err = wc.ParseUri(a.Uri)
+
+	us, err := ams.MakeUriSource(ams.WithStaticUri(a.Uri), ams.WithClipboardUri(a.ClipboardUri))
+	if err != nil {
+		return errors.Wrap(err, "failed to make uri source")
+	}
+
+	uristr, err := us.Uri()
+	if err != nil {
+		return errors.Wrap(err, "failed to read uri from source")
+	}
+
+	if len(uristr) > 0 {
+		u, err = wc.ParseUri(uristr)
 		if err != nil {
 			return err
 		}
@@ -234,6 +243,7 @@ func main() {
 	flag.UintVar(&a.Threshold, "threshold", 1, "Multisig threshold")
 	flag.BoolVar(&a.Debug, "debug", false, "debug mode")
 	flag.Var(&a.Paths, "path", "transactions input paths")
+	flag.BoolVar(&a.ClipboardUri, "cu", false, "use WalletConnect uri from clipboard")
 	flag.Parse()
 
 	err := run(a)

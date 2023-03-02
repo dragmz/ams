@@ -128,13 +128,14 @@ func run(a args) error {
 		return errors.New("only one uri can be used")
 	}
 
-	uristr := a.Uri
+	us, err := ams.MakeUriSource(ams.WithStaticUri(a.Uri), ams.WithClipboardUri(a.ClipboardUri))
+	if err != nil {
+		return errors.Wrap(err, "failed to make uri source")
+	}
 
-	if len(uristr) == 0 && a.ClipboardUri {
-		uristr, err = ams.ReadWcFromClipboard()
-		if err != nil {
-			return errors.Wrap(err, "Failed to read uri from clipboard")
-		}
+	uristr, err := us.Uri()
+	if err != nil {
+		return errors.Wrap(err, "failed to read uri from source")
 	}
 
 	uri, err := wc.ParseUri(uristr)
