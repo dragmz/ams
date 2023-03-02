@@ -1,4 +1,4 @@
-package ams_test
+package main
 
 import (
 	"context"
@@ -11,7 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMultisigAuthAddr(t *testing.T) {
+func main() {
+	t := &testing.T{}
+
 	ac, err := algod.MakeClient("https://testnet-api.algonode.network", "")
 	assert.NoError(t, err)
 
