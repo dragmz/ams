@@ -17,16 +17,16 @@ import (
 )
 
 type args struct {
-	Mnemonic  string
-	Addr      string
-	Threshold int
-	Txn       string
-	Debug     bool
-	Uri       string
-	AuthAddr  string
+	Mnemonic    string
+	Addr        string
+	Threshold   int
+	Txn         string
+	Debug       bool
+	Uri         string
+	AuthAddr    string
+	MatchSender string
 
-	ClipboardQrUri bool
-	ClipboardUri   bool
+	ClipboardUri bool
 }
 
 type manualConfirmSignerWrapper struct {
@@ -120,9 +120,6 @@ func run(a args) error {
 	if len(a.Uri) > 0 {
 		uris++
 	}
-	if a.ClipboardQrUri {
-		uris++
-	}
 	if a.ClipboardUri {
 		uris++
 	}
@@ -132,13 +129,6 @@ func run(a args) error {
 	}
 
 	uristr := a.Uri
-
-	if len(uristr) == 0 && a.ClipboardQrUri {
-		uristr, err = ams.ReadQrFromClipboard()
-		if err != nil {
-			return errors.Wrap(err, "failed to read uri from clipboard qr code")
-		}
-	}
 
 	if len(uristr) == 0 && a.ClipboardUri {
 		uristr, err = ams.ReadWcFromClipboard()
@@ -152,7 +142,9 @@ func run(a args) error {
 		return errors.Wrap(err, "failed to parse uri")
 	}
 
-	sopts := []ams.LocalSignerOption{}
+	sopts := []ams.LocalSignerOption{
+		ams.WithLocalSignerMatchSender(a.MatchSender),
+	}
 
 	if len(addrs) > 1 {
 		sopts = append(sopts,
@@ -194,8 +186,8 @@ func main() {
 	flag.BoolVar(&a.Debug, "debug", false, "debug mode")
 	flag.StringVar(&a.Uri, "uri", "", "WalletConnect uri")
 	flag.StringVar(&a.AuthAddr, "auth-addr", "", "Algorand auth address")
-	flag.BoolVar(&a.ClipboardQrUri, "cqu", false, "use WalletConnect uri from QR code in clipboard")
 	flag.BoolVar(&a.ClipboardUri, "cu", false, "use WalletConnect uri from clipboard")
+	flag.StringVar(&a.MatchSender, "match", "", "sign only transactions with matching sender")
 
 	flag.Parse()
 

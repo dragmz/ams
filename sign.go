@@ -17,9 +17,10 @@ type Signer interface {
 }
 
 type LocalSigner struct {
-	sk   ed25519.PrivateKey
-	ma   *crypto.MultisigAccount
-	addr string
+	sk    ed25519.PrivateKey
+	ma    *crypto.MultisigAccount
+	addr  string
+	match string
 }
 
 type LocalSignerOption func(s *LocalSigner) error
@@ -35,6 +36,13 @@ func MakeLocalSigner(addr string, sk ed25519.PrivateKey, opts ...LocalSignerOpti
 	s.addr = addr
 
 	return s, nil
+}
+
+func WithLocalSignerMatchSender(match string) LocalSignerOption {
+	return func(s *LocalSigner) error {
+		s.match = match
+		return nil
+	}
 }
 
 func WithLocalSignerMultisigAccount(ma crypto.MultisigAccount) LocalSignerOption {
@@ -89,6 +97,12 @@ func (s *LocalSigner) Sign(req wc.AlgoSignRequest) (*wc.AlgoSignResponse, error)
 	res := make([][]byte, len(txs))
 
 	for i, txn := range txs {
+		if len(s.match) > 0 {
+			if txn.Sender.String() != s.match {
+				continue
+			}
+		}
+
 		_, stx, err := sign(txn)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to sign transaction")
