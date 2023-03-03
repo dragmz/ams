@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/algorand/go-algorand-sdk/crypto"
 	"github.com/algorand/go-algorand-sdk/encoding/msgpack"
-	"github.com/algorand/go-algorand-sdk/mnemonic"
 	"github.com/algorand/go-algorand-sdk/types"
 	"github.com/dragmz/ams"
 	"github.com/dragmz/wc"
@@ -27,6 +25,8 @@ type args struct {
 	MatchSender string
 
 	ClipboardUri bool
+
+	PrivateKeyPath string
 }
 
 type manualConfirmSignerWrapper struct {
@@ -74,88 +74,50 @@ func (s *manualConfirmSignerWrapper) Address() string {
 }
 
 func run(a args) error {
-	addrs, err := ams.ParseAddrs(a.Addr, ",")
+	as, err := ams.MakeAddressSource(
+		ams.WithAddressString(a.Addr),
+		ams.WithAddressThreshold(a.Threshold),
+	)
 	if err != nil {
-		return errors.Wrap(err, "failed to parse addresses")
+		return errors.Wrap(err, "failed to make address source")
 	}
 
-	if len(addrs) == 0 {
-		return errors.New("missing address")
-	}
-
-	var addr string
-
-	var ma crypto.MultisigAccount
-	if len(addrs) > 1 {
-		ma, err = crypto.MultisigAccountWithParams(1, uint8(a.Threshold), addrs)
-		if err != nil {
-			return errors.Wrap(err, "failed to build multisig account")
-		}
-
-		maddr, err := ma.Address()
-		if err != nil {
-			return errors.Wrap(err, "failed to get multisig address")
-		}
-
-		fmt.Println("Multisig address:", maddr)
-		addr = maddr.String()
-	} else {
-		fmt.Println("Address:", addrs[0])
-		addr = addrs[0].String()
-	}
-
-	sk, err := mnemonic.ToPrivateKey(a.Mnemonic)
-	if err != nil {
-		return errors.Wrap(err, "failed to convert mnemonic to private key")
-	}
-
-	acc, err := crypto.AccountFromPrivateKey(sk)
-	if err != nil {
-		return errors.Wrap(err, "failed to convert private key to account")
-	}
-
-	rdr := bufio.NewReader(os.Stdin)
-
-	uris := 0
-	if len(a.Uri) > 0 {
-		uris++
-	}
-	if a.ClipboardUri {
-		uris++
-	}
-
-	if uris > 1 {
-		return errors.New("only one uri can be used")
-	}
-
-	us, err := ams.MakeUriSource(ams.WithStaticUri(a.Uri), ams.WithClipboardUri(a.ClipboardUri))
+	us, err := ams.MakeUriSource(
+		ams.WithUriSourceStaticUri(a.Uri),
+		ams.WithUriSourceClipboardUri(a.ClipboardUri),
+		ams.WithUriSourceNonEmpty(true),
+	)
 	if err != nil {
 		return errors.Wrap(err, "failed to make uri source")
 	}
 
-	uristr, err := us.Uri()
+	uri, err := us.Uri()
 	if err != nil {
 		return errors.Wrap(err, "failed to read uri from source")
 	}
 
-	uri, err := wc.ParseUri(uristr)
+	accs, err := ams.MakeAccountSource(
+		ams.WithAccountSourceMnemonic(a.Mnemonic),
+		ams.WithAccountSourcePrivateKeyPath(a.PrivateKeyPath),
+	)
 	if err != nil {
-		return errors.Wrap(err, "failed to parse uri")
+		return errors.Wrap(err, "failed to make account source")
 	}
 
-	sopts := []ams.LocalSignerOption{
+	acc, err := accs.ReadAccount()
+	if err != nil {
+		return errors.Wrap(err, "failed to read account from source")
+	}
+
+	signer, err := ams.MakeLocalSigner(as.Address(), acc.PrivateKey,
 		ams.WithLocalSignerMatchSender(a.MatchSender),
-	}
-
-	if len(addrs) > 1 {
-		sopts = append(sopts,
-			ams.WithLocalSignerMultisigAccount(ma))
-	}
-
-	signer, err := ams.MakeLocalSigner(addr, acc.PrivateKey, sopts...)
+		ams.WithLocalSignerMultisigAccount(as.Multisig()),
+	)
 	if err != nil {
 		return errors.Wrap(err, "failed to make signer")
 	}
+
+	rdr := bufio.NewReader(os.Stdin)
 
 	signer = &manualConfirmSignerWrapper{
 		s: signer,
@@ -180,8 +142,11 @@ func run(a args) error {
 func main() {
 	var a args
 
+	flag.StringVar(&a.PrivateKeyPath, "pk-path", "", "private key json file path")
+
 	flag.StringVar(&a.Mnemonic, "mnemonic", "", "private key mnemonic")
 	flag.StringVar(&a.Addr, "addr", "", "multisig addresses")
+
 	flag.IntVar(&a.Threshold, "threshold", 0, "multisig threshold")
 	flag.StringVar(&a.Txn, "txn", "", "base32 transaction data")
 	flag.BoolVar(&a.Debug, "debug", false, "debug mode")

@@ -45,15 +45,18 @@ func WithLocalSignerMatchSender(match string) LocalSignerOption {
 	}
 }
 
-func WithLocalSignerMultisigAccount(ma crypto.MultisigAccount) LocalSignerOption {
+func WithLocalSignerMultisigAccount(ma *crypto.MultisigAccount) LocalSignerOption {
 	return func(s *LocalSigner) error {
-		maddr, err := ma.Address()
-		if err != nil {
-			return errors.Wrap(err, "failed to get multisig address")
+		if ma != nil {
+			maddr, err := ma.Address()
+			if err != nil {
+				return errors.Wrap(err, "failed to get multisig address")
+			}
+
+			s.addr = maddr.String()
 		}
 
-		s.addr = maddr.String()
-		s.ma = &ma
+		s.ma = ma
 
 		return nil
 	}

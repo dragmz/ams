@@ -51,7 +51,7 @@ func run(a args) error {
 		wc.WithClientConn(dapp),
 		wc.WithClientUrlHandler(func(uri wc.Uri) error {
 			signer, err := ams.MakeLocalSigner(acc.Address.String(), acc.PrivateKey,
-				ams.WithLocalSignerMultisigAccount(ma),
+				ams.WithLocalSignerMultisigAccount(&ma),
 			)
 			if err != nil {
 				return errors.Wrap(err, "failed to make signer")

@@ -6,13 +6,11 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"os"
 
 	"github.com/algorand/go-algorand-sdk/mnemonic"
 	"github.com/dragmz/ams"
 	"github.com/pkg/errors"
-	"golang.org/x/term"
 )
 
 type args struct {
@@ -24,16 +22,15 @@ type args struct {
 }
 
 func run(a args) error {
+	var err error
+
 	if len(a.Password) == 0 {
-		fmt.Println("Enter password:")
-		bs, err := term.ReadPassword(int(os.Stdin.Fd()))
+		a.Password, err = ams.ReadPasswordFromStdin(true)
 		if err != nil {
 			return errors.Wrap(err, "failed to read password")
 		}
-
-		a.Password = string(bs)
-		fmt.Println(a.Password)
 	}
+
 	sk, err := mnemonic.ToPrivateKey(a.Mnemonic)
 	if err != nil {
 		return errors.Wrap(err, "failed to convert mnemonic to private key")
@@ -45,7 +42,7 @@ func run(a args) error {
 		return errors.Wrap(err, "failed to generate salt")
 	}
 
-	iv := make([]byte, 16)
+	iv := make([]byte, 12)
 	_, err = rand.Read(iv)
 	if err != nil {
 		return errors.Wrap(err, "failed to make iv")
@@ -60,7 +57,7 @@ func run(a args) error {
 		Iterations: iterations,
 		KeyLength:  keyLength,
 		Hash:       hash,
-		Iv:         iv,
+		Nonce:      iv,
 	}
 
 	cipher, err := kc.Encrypt(sk, a.Password)

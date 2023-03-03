@@ -4,8 +4,12 @@ import (
 	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
+	"encoding/json"
+	"os"
 
+	algocrypto "github.com/algorand/go-algorand-sdk/crypto"
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -14,7 +18,7 @@ type KeyCryptoConfig struct {
 	Iterations int         `json:"iterations"`
 	KeyLength  int         `json:"key_length"`
 	Hash       crypto.Hash `json:"hash"`
-	Iv         []byte      `json:"iv"`
+	Nonce      []byte      `json:"nonce"`
 }
 
 type KeyCryptoPackage struct {
@@ -43,13 +47,12 @@ func (kc KeyCryptoConfig) Encrypt(plainBytes []byte, password string) ([]byte, e
 		return nil, errors.Wrap(err, "failed to make cipher")
 	}
 
-	e := cipher.NewCBCEncrypter(c, kc.Iv)
+	e, err := cipher.NewGCM(c)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to make cbc")
+		return nil, errors.Wrap(err, "failed to make gcm")
 	}
 
-	cbs := make([]byte, len(plainBytes))
-	e.CryptBlocks(cbs, plainBytes)
+	cbs := e.Seal(nil, kc.Nonce, plainBytes, nil)
 
 	return cbs, nil
 }
@@ -60,13 +63,44 @@ func (kc KeyCryptoConfig) Decrypt(cipherBytes []byte, password string) ([]byte, 
 		return nil, errors.Wrap(err, "failed to make cipher")
 	}
 
-	e := cipher.NewCBCDecrypter(c, kc.Iv)
+	e, err := cipher.NewGCM(c)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to make cbc")
 	}
 
-	pbs := make([]byte, len(cipherBytes))
-	e.CryptBlocks(pbs, cipherBytes)
+	pbs, err := e.Open(nil, kc.Nonce, cipherBytes, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decrypt")
+	}
 
 	return pbs, nil
+}
+
+func ReadAccountFromFile(path string, password string) (*algocrypto.Account, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to open file")
+	}
+
+	r := json.NewDecoder(f)
+
+	var kp KeyCryptoPackage
+	err = r.Decode(&kp)
+	if err != nil {
+		return nil, errors.Wrap(err, "faild to read key crypto package")
+	}
+
+	bs, err := kp.Decrypt(password)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decrypt key")
+	}
+
+	sk := ed25519.PrivateKey(bs)
+
+	acc, err := algocrypto.AccountFromPrivateKey(sk)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read account from private key")
+	}
+
+	return &acc, nil
 }

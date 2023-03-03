@@ -1,21 +1,32 @@
 package ams
 
-import "github.com/pkg/errors"
+import (
+	"github.com/dragmz/wc"
+	"github.com/pkg/errors"
+)
 
 type UriSource struct {
-	uri string
-	cb  bool
+	uri     string
+	cb      bool
+	require bool
 }
 
 type UriSourceOption func(s *UriSource)
 
-func WithStaticUri(uri string) UriSourceOption {
+// WithUriSourceNonEmpty set to true makes the UriSource return an error when reading uri and no sources are provided
+func WithUriSourceNonEmpty(requireNonEmpty bool) UriSourceOption {
+	return func(s *UriSource) {
+		s.require = requireNonEmpty
+	}
+}
+
+func WithUriSourceStaticUri(uri string) UriSourceOption {
 	return func(s *UriSource) {
 		s.uri = uri
 	}
 }
 
-func WithClipboardUri(enable bool) UriSourceOption {
+func WithUriSourceClipboardUri(enable bool) UriSourceOption {
 	return func(s *UriSource) {
 		s.cb = enable
 	}
@@ -31,7 +42,7 @@ func MakeUriSource(opts ...UriSourceOption) (*UriSource, error) {
 	return s, nil
 }
 
-func (s *UriSource) Uri() (string, error) {
+func (s *UriSource) Uri() (*wc.Uri, error) {
 	uris := 0
 
 	if len(s.uri) > 0 {
@@ -43,21 +54,25 @@ func (s *UriSource) Uri() (string, error) {
 	}
 
 	if uris > 1 {
-		return "", errors.New("cannot read uri from multiple sources")
+		return nil, errors.New("cannot read uri from multiple sources")
 	}
 
 	if len(s.uri) > 0 {
-		return s.uri, nil
+		return wc.ParseUri(s.uri)
 	}
 
 	if s.cb {
 		uri, err := ReadWcFromClipboard()
 		if err != nil {
-			return "", errors.Wrap(err, "failed to read uri from clipboard")
+			return nil, errors.Wrap(err, "failed to read uri from clipboard")
 		}
 
-		return uri, nil
+		return wc.ParseUri(uri)
 	}
 
-	return "", nil
+	if s.require {
+		return nil, errors.New("missing uri source")
+	}
+
+	return nil, nil
 }

@@ -66,27 +66,17 @@ func run(a args) error {
 		fmt.Println("Multisig:", addr)
 	}
 
-	var u *wc.Uri
-
-	us, err := ams.MakeUriSource(ams.WithStaticUri(a.Uri), ams.WithClipboardUri(a.ClipboardUri))
+	us, err := ams.MakeUriSource(
+		ams.WithUriSourceStaticUri(a.Uri),
+		ams.WithUriSourceClipboardUri(a.ClipboardUri),
+	)
 	if err != nil {
 		return errors.Wrap(err, "failed to make uri source")
 	}
 
-	uristr, err := us.Uri()
+	u, err := us.Uri()
 	if err != nil {
 		return errors.Wrap(err, "failed to read uri from source")
-	}
-
-	if len(uristr) > 0 {
-		u, err = wc.ParseUri(uristr)
-		if err != nil {
-			return err
-		}
-
-		if a.Debug {
-			fmt.Println("Uri:", u)
-		}
 	}
 
 	meta := wc.SessionRequestPeerMeta{
